@@ -1,0 +1,9 @@
+<!doctype html>
+
+<h1>Logged as {{ session.user }} with {{ session.other_account }}</h1>
+<h2>Authorize {{ session.account }} as a valid account under your control?</h2>
+<form
+  action=/authorize/{{type}}/{{session.account}}/on/{{session.user}}/with/{{session.other_account}}
+  method=post>
+  <button>I'm ok with that</button>
+</form>

@@ -2,7 +2,7 @@ import re
 import random
 from urllib import parse
 
-from flask import session, request, redirect
+from flask import session, request, redirect, render_template
 
 try:
     from .app import app, redis, pg
@@ -24,6 +24,7 @@ def login(user, account):
     session['user'] = user
     session['account'] = account
     session['redirect_uri'] = request.args.get('redirect_url')
+    session['other_account'] = None
 
     if len(account.split('@')) == 1:
         if re.match(r'^\+\d+$', account):
@@ -59,8 +60,20 @@ def login(user, account):
 
 @app.route('/callback/<type>/<user>/with/<account>', methods=['GET', 'POST'])
 def callback(type, user, account):
-    if session['user'] != user or session['account'] != account:
-        return 'wrong user/account, go to /login first', 403
+    if session['user'] != user:
+        return 'wrong user, go to /login first', 403
+
+    if session.get('other_account') == account:
+        # if this exists, it means `other_account` is being used
+        # to authorize the new `account` into `user`.
+        valid = globals()[type].callback(user, account)
+        if valid:
+            return render_template('authorize-new.html', type=type)
+        else:
+            return '0'
+
+    if session['account'] != account:
+        return 'wrong account, go to /login first', 403
 
     valid = globals()[type].callback(user, account)
 
@@ -70,15 +83,56 @@ def callback(type, user, account):
             with pg.cursor() as c:
                 c.execute(
                     'INSERT INTO users (id) VALUES (%s) '
-                    'ON CONFLICT DO NOTHING',
+                    'ON CONFLICT DO NOTHING '
+                    'RETURNING id',
                     (user,)
                 )
+
+                if c.rowcount == 0:
+                    # there was a conflict
+                    c.execute(
+                        'SELECT type, account FROM accounts '
+                        'WHERE user_id = %s AND type != %s',
+                        (user, type)
+                    )
+
+                    pg.rollback()
+
+                    other_type, other_account = c.fetchone()
+                    session['other_account'] = other_account
+                    return globals()[other_type].handle(user, other_account)
+
                 c.execute(
                     'INSERT INTO accounts (type, account, user_id) '
                     'VALUES (%s, %s, %s)',
                     (type, account, user)
                 )
 
+    return return_response(valid)
+
+
+@app.route('/authorize/<type>/<account>/on/<user>/with/<other_account>',
+           methods=['POST'])
+def authorize(type, account, user, other_account):
+    if session['account'] != account or \
+            session['user'] != user or \
+            session['other_account'] != other_account:
+        return 'wrong user/account, go to /login first', 403
+
+    with pg:
+        with pg.cursor() as c:
+            c.execute(
+                'INSERT INTO accounts (type, account, user_id) '
+                'VALUES (%s, %s, %s) '
+                'ON CONFLICT (account) '
+                'DO UPDATE SET user_id = %s',
+                (type, account, user, user)
+            )
+
+    return return_response(True)
+
+
+def return_response(valid):
     # pass response to external caller
     if session.get('redirect_uri'):
         code = int(random.random() * 999999999)
