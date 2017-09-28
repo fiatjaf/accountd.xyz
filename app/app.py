@@ -7,8 +7,7 @@ from redis import StrictRedis
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
-app.config['SERVICE_URL'] = 'https://' + os.getenv('HOST') + \
-                            ':' + os.getenv('PORT')
+app.config['SERVICE_URL'] = os.getenv('SERVICE_URL')
 
 r = parse.urlparse(os.getenv('REDIS_URL'))
 redis = StrictRedis(host=r.hostname, port=r.port, password=r.password)
