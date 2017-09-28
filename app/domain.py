@@ -1,8 +1,12 @@
-import os
 from urllib import parse
 
 import requests
 from flask import redirect, url_for, request
+
+try:
+    from .app import app
+except SystemError:
+    from app import app
 
 TYPE = 'domain'
 
@@ -10,7 +14,7 @@ TYPE = 'domain'
 def handle(user, account):
     return redirect('https://indieauth.com/auth?' + parse.urlencode({
         'me': account,
-        'client_id': os.getenv('SERVICE_URL'),
+        'client_id': app.config['SERVICE_URL'],
         'redirect_uri': _redirect_uri(user, account)
     }))
 
@@ -20,7 +24,7 @@ def callback(user, account):
     r = requests.post('https://indieauth.com/auth', data={
         'code': code,
         'redirect_uri': _redirect_uri(user, account),
-        'client_id': os.getenv('SERVICE_URL')
+        'client_id': app.config['SERVICE_URL']
     }, headers={'Accept': 'application/json'})
     if not r.ok:
         raise Exception(r.text)
@@ -29,7 +33,7 @@ def callback(user, account):
 
 
 def _redirect_uri(user, account):
-    return os.getenv('SERVICE_URL') + url_for(
+    return app.config['SERVICE_URL'] + url_for(
         '.callback',
         type=TYPE, user=user, account=account,
     )

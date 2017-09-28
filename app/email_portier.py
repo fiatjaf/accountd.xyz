@@ -1,17 +1,21 @@
-import os
 import random
 
 from portier.client import get_verified_email
 from flask import session, request, url_for
 
+try:
+    from .app import app
+except SystemError:
+    from app import app
+
 TYPE = 'email'
 PORTIER_BROKER = 'https://broker.portier.io'
-URL = os.getenv('SERVICE_URL')
+URL = app.config['SERVICE_URL']
 
 
 def handle(user, account):
     nonce = '{}'.format(random.random())
-    redirect = os.getenv('SERVICE_URL') + url_for(
+    redirect = URL + url_for(
         '.callback',
         type=TYPE, user=user, account=account,
     )
