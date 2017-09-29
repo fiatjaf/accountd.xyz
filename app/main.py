@@ -108,7 +108,7 @@ def callback(type, user, account):
                     (type, account, user)
                 )
 
-    return return_response(valid)
+    return return_response(valid, user)
 
 
 @app.route('/authorize/<type>/<account>/on/<user>/with/<other_account>',
@@ -129,16 +129,16 @@ def authorize(type, account, user, other_account):
                 (type, account, user, user)
             )
 
-    return return_response(True)
+    return return_response(True, user)
 
 
 @app.route('/verify/<code>', methods=['POST'])
 def verify(code):
-    valid = redis.get('code:' + code)
-    return str(valid)
+    user = redis.get('code:' + code)
+    return user
 
 
-def return_response(valid):
+def return_response(valid, user):
     # pass response to external caller
     if session.get('redirect_uri'):
         code = int(random.random() * 999999999)
@@ -149,7 +149,8 @@ def return_response(valid):
         u.query = parse.urlencode(qs)
         back = parse.urlunparse(u)
 
-        redis.setex('code:' + code, 180, 1 if valid else 0)
+        if valid:
+            redis.setex('code:' + code, 180, user)
 
         return redirect(back)
     else:
