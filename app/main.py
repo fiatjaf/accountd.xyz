@@ -138,6 +138,21 @@ def verify(code):
     return user
 
 
+@app.route('/is/<account>/<user>')
+def is_(account, user):
+    with pg:
+        with pg.cursor() as c:
+            c.execute(
+                'SELECT user_id FROM accounts '
+                'WHERE account = %s AND user_id = %s',
+                (account, user)
+            )
+            if c.rowcount:
+                return 'true'
+            else:
+                return 'false'
+
+
 def return_response(valid, user):
     # pass response to external caller
     if session.get('redirect_uri'):
