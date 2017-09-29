@@ -132,6 +132,12 @@ def authorize(type, account, user, other_account):
     return return_response(True)
 
 
+@app.route('/verify/<code>', methods=['POST'])
+def verify(code):
+    valid = redis.get('code:' + code)
+    return str(valid)
+
+
 def return_response(valid):
     # pass response to external caller
     if session.get('redirect_uri'):
