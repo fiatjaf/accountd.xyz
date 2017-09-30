@@ -8,7 +8,6 @@ try:
 except SystemError:
     from app import app
 
-TYPE = 'email'
 PORTIER_BROKER = 'https://broker.portier.io'
 URL = app.config['SERVICE_URL']
 
@@ -17,7 +16,7 @@ def handle(user, account):
     nonce = '{}'.format(random.random())
     redirect = URL + url_for(
         '.callback',
-        type=TYPE, user=user, account=account,
+        user=user, account=account,
     )
 
     cache = Cache()
@@ -58,13 +57,10 @@ def callback(user, account):
 
 class Cache(object):
     def get(self, key):
-        print('GETTING', key)
         return session.get('pc:' + key)
 
     def set(self, key, value, timeout):
-        print('SETTING', key)
         session['pc:' + key] = value
 
     def delete(self, key):
-        print('DELETING', key)
         session.pop('pc:' + key)

@@ -8,8 +8,6 @@ try:
 except SystemError:
     from app import app
 
-TYPE = 'domain'
-
 
 def handle(user, account):
     return redirect('https://indieauth.com/auth?' + parse.urlencode({
@@ -35,5 +33,5 @@ def callback(user, account):
 def _redirect_uri(user, account):
     return app.config['SERVICE_URL'] + url_for(
         '.callback',
-        type=TYPE, user=user, account=account,
+        user=user, account=account,
     )
