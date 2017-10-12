@@ -73,5 +73,4 @@ def callback(user, account):
         return False
 
     user = json.loads(content.decode('utf-8'))
-    print(user)
     return user['screen_name'].lower() == account.split('@')[0]

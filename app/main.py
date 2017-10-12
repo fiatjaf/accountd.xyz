@@ -2,7 +2,7 @@ import random
 from urllib import parse
 
 from flask import session, request, redirect, render_template, \
-                  jsonify
+                  jsonify, url_for
 
 try:
     from .app import app, redis, pg
@@ -40,14 +40,15 @@ def login(user, account):
     session['user'] = user
     session['account'] = account
     session['redirect_uri'] = request.args.get('redirect_uri')
-    session['other_account'] = None
+    session['other_account'] = request.args.get('other_account')
 
-    type = account_type(account)
+    request_account = session['other_account'] or account
+    type = account_type(request_account)
 
     try:
-        return globals()[type].handle(user, account)
+        return globals()[type].handle(user, request_account)
     except KeyError:
-        return 'are you {}? what is {}?'.format(user, account), 404
+        return 'are you {}? what is {}?'.format(user, request_account), 404
 
 
 @app.route('/callback/<user>/with/<account>', methods=['GET', 'POST'])
@@ -108,12 +109,17 @@ def callback(user, account):
                         alternatives.append(row[0])
 
                     if len(alternatives) == 1:
-                        other_account = alternatives[0]
-                        session['other_account'] = other_account
-                        t = account_type(other_account)
-                        return globals()[t].handle(user, other_account)
+                        return redirect(url_for(
+                            '.login',
+                            user=user, account=account,
+                            redirect_uri=session['redirect_uri'],
+                            other_account=alternatives[0]
+                        ))
                     else:
-                        return render_template('alternatives.html')
+                        return render_template(
+                            'alternatives.html',
+                            alternatives=alternatives
+                        )
 
     return return_response(valid, user)
 

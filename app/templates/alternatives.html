@@ -1,0 +1,12 @@
+<!doctype html>
+
+<h1>Trying to login as {{ session.user }} with {{ session.account }}</h1>
+<h2>To authorize that, choose an account:</h2>
+
+<ul>{% for account in alternatives %}
+  <li><form
+    action=/login/{{ session.user }}/with/{{ session.account }}>
+    <input type=hidden name=other_account value={{ account }}>
+    <button>{{ account }}</button>
+  </form></li>{% endfor %}
+</ul>
