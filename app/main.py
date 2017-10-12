@@ -1,23 +1,26 @@
 import random
 from urllib import parse
 
-from flask import session, request, redirect, render_template
+from flask import session, request, redirect, render_template, \
+                  jsonify
 
 try:
     from .app import app, redis, pg
-    from . import helpers
+    from .helpers import account_type
     from . import email_portier as email
     from . import domain
+    from . import twitter
 except SystemError:
     from app import app, redis, pg
-    import helpers
+    from helpers import account_type
     import email_portier as email
     import domain
+    import twitter
 
 
 # satisfy flake8
 def x(*args): None
-x(email, domain)
+x(email, domain, twitter)
 # ~
 
 
@@ -29,15 +32,15 @@ def index():
 @app.route('/login/<user>/with/<account>')
 @app.route('/login', defaults={'user': None, 'account': None})
 def login(user, account):
-    user = user or request.args['user']
-    account = account or request.args['account']
+    user = (user or request.args['user']).lower()
+    account = (account or request.args['account']).lower()
 
     session['user'] = user
     session['account'] = account
     session['redirect_uri'] = request.args.get('redirect_uri')
     session['other_account'] = None
 
-    type = helpers.account_type(account)
+    type = account_type(account)
 
     try:
         return globals()[type].handle(user, account)
@@ -46,15 +49,18 @@ def login(user, account):
 
 
 @app.route('/callback/<user>/with/<account>', methods=['GET', 'POST'])
+@app.route('/callback', defaults={'user': None, 'account': None})
 def callback(user, account):
-    print('SESSION', session)
+    user = user or request.args['user']
+    account = account or request.args['account']
+
     if session['user'] != user:
         return 'wrong user, go to /login first', 403
 
     if session.get('other_account') == account:
         # if this exists, it means `other_account` is being used
         # to authorize the new `account` into `user`.
-        type = helpers.account_type(account)
+        type = account_type(account)
         valid = globals()[type].callback(user, account)
         if valid:
             return render_template('authorize-new.html', type=type)
@@ -64,7 +70,7 @@ def callback(user, account):
     if session['account'] != account:
         return 'wrong account, go to /login first', 403
 
-    type = helpers.account_type(account)
+    type = account_type(account)
     valid = globals()[type].callback(user, account)
 
     # make link on our database
@@ -102,7 +108,7 @@ def callback(user, account):
                     if len(alternatives) == 1:
                         other_account = alternatives[0]
                         session['other_account'] = other_account
-                        t = helpers.account_type(other_account)
+                        t = account_type(other_account)
                         return globals()[t].handle(user, other_account)
                     else:
                         return render_template('alternatives.html')
