@@ -10,17 +10,19 @@ try:
     from . import email_portier as email
     from . import domain
     from . import twitter
+    from . import github
 except SystemError:
     from app import app, redis, pg
     from helpers import account_type
     import email_portier as email
     import domain
     import twitter
+    import github
 
 
 # satisfy flake8
 def x(*args): None
-x(email, domain, twitter)
+x(email, domain, twitter, github)
 # ~
 
 
@@ -139,8 +141,44 @@ def authorize(type, account, user, other_account):
 
 @app.route('/verify/<code>', methods=['POST'])
 def verify(code):
-    user = redis.get('code:' + code)
-    return user
+    user = redis.get('code:' + code).decode('utf-8')
+    return jsonify(_lookup(user))
+
+
+@app.route('/lookup/<name>')
+def lookup(name):
+    return jsonify(_lookup(name))
+
+
+def _lookup(name):
+    name = name.strip()
+    if not name:
+        return {'error': 'invalid'}
+
+    with pg:
+        with pg.cursor() as c:
+            c.execute(
+                'SELECT user_id, account FROM accounts '
+                'WHERE user_id = %s OR account = %s',
+                (name, name)
+            )
+
+            rows = c.fetchall()
+            accs = [{
+                'account': r[1],
+                'type': account_type(r[1])
+            } for r in rows]
+
+            if c.rowcount:
+                return {
+                    'id': rows[0][0],
+                    'accounts': accs
+                }
+            else:
+                return {
+                    'id': None,
+                    'type': account_type(name)
+                }
 
 
 @app.route('/is/<account>/<user>')
@@ -153,9 +191,9 @@ def is_(account, user):
                 (account, user)
             )
             if c.rowcount:
-                return 'true'
+                return jsonify(True)
             else:
-                return 'false'
+                return jsonify(False)
 
 
 def return_response(valid, user):
