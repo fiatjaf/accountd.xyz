@@ -23,12 +23,14 @@ def handle(user, account):
     consumer = oauth.Consumer(consumer_key, consumer_secret)
     client = oauth.Client(consumer)
 
+    callback = app.config['SERVICE_URL'] + url_for(
+        '.callback', user=user, account=account)
+
     resp, content = client.request(
         request_token_url,
         method='POST',
         body=urlencode({
-            'oauth_callback': app.config['SERVICE_URL'] +
-            url_for('.callback', user=user, account=account)
+            'oauth_callback': callback
         })
     )
     if resp.status != 200:
