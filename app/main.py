@@ -1,3 +1,4 @@
+import re
 import random
 from urllib import parse
 
@@ -37,6 +38,9 @@ def login(user, account):
     user = (user or request.args['user']).lower()
     account = (account or request.args['account']).lower()
 
+    if not re.match('^[a-z0-9_]+$', user):
+        return 'username must use only ascii letters, numbers and underscores.'
+
     session['user'] = user
     session['account'] = account
     session['redirect_uri'] = request.args.get('redirect_uri')
@@ -66,7 +70,7 @@ def callback(user, account):
         type = account_type(account)
         valid = globals()[type].callback(user, account)
         if valid:
-            return render_template('authorize-new.html', type=type)
+            return render_template('link-new.html', type=type)
         else:
             return '0'
 
@@ -76,57 +80,97 @@ def callback(user, account):
     type = account_type(account)
     valid = globals()[type].callback(user, account)
 
-    # make link on our database
     if valid:
-        with pg:
-            with pg.cursor() as c:
+        session['authorized'] = session.get('authorized', [])
+        session['authorized'].append((user, account))
+        session.modified = True
+
+        return redirect(app.config['SERVICE_URL'] + url_for(
+            '.authorized', user=user, account=account))
+    else:
+        return return_response(False, user)
+
+
+@app.route('/authorized/<user>/with/<account>')
+def authorized(user, account):
+    if (user, account) not in session['authorized']:
+        return return_response(False, user)
+
+    # make link on our database
+    with pg:
+        with pg.cursor() as c:
+            c.execute(
+                'SELECT user_id, account FROM accounts '
+                'WHERE (user_id = %s OR account = %s)',
+                (user, account)
+            )
+
+            if c.rowcount == 0:
+                # user is new, register
                 c.execute(
-                    'SELECT account FROM accounts '
-                    'WHERE user_id = %s',
-                    (user,)
+                    'INSERT INTO accounts (user_id, account) '
+                    'VALUES (%s, %s)',
+                    (user, account)
                 )
+                return return_response(True, user)
 
-                if c.rowcount == 0:
-                    # user is new, register
-                    c.execute(
-                        'INSERT INTO accounts (user_id, account) '
-                        'VALUES (%s, %s)',
-                        (user, account)
-                    )
+            else:
+                # this user is already registered
+                alternatives = []
 
-                else:
-                    # this user is already registered
-                    alternatives = []
-
-                    # the user must authorize the new account
-                    # using one of the his previous accounts
-                    for row in c.fetchall():
-                        if row[0] == account:
+                # the user must authorize the new account
+                # using one of the his previous accounts
+                for r_user, r_account in c.fetchall():
+                    if r_account == account:
+                        if r_user == user:
                             # this same account has been registered
                             # so everything is fine
-                            return return_response(valid, user)
+                            return return_response(True, user)
+                        else:
+                            # this account was registered with a
+                            # different user, let's prompt the user
+                            return render_template(
+                                'prompt_user.html',
+                                r_user=r_user
+                            )
 
-                        alternatives.append(row[0])
+                    alternatives.append(r_account)
 
-                    if len(alternatives) == 1:
-                        return redirect(url_for(
-                            '.login',
-                            user=user, account=account,
-                            redirect_uri=session['redirect_uri'],
-                            other_account=alternatives[0]
-                        ))
-                    else:
-                        return render_template(
-                            'alternatives.html',
-                            alternatives=alternatives
-                        )
+                if len(alternatives) == 1:
+                    print(request.url)
+                    return redirect(app.config['SERVICE_URL'] + url_for(
+                        '.login',
+                        user=user, account=account,
+                        redirect_uri=session['redirect_uri'],
+                        other_account=alternatives[0]
+                    ))
+                else:
+                    return render_template(
+                        'alternatives.html',
+                        alternatives=alternatives
+                    )
 
-    return return_response(valid, user)
+
+@app.route('/redirect/<current_user>/to/<next_user>/with/<account>')
+def redirect_user_id(current_user, next_user, account):
+    if session['account'] != account or \
+            session['user'] != current_user:
+        return 'wrong user/account, go to /login first', 403
+
+    session['authorized'] = session.get('authorized', [])
+    session['authorized'].append((next_user, account))
+    session.modified = True
+
+    return redirect(app.config['SERVICE_URL'] + url_for(
+        '.authorized',
+        user=next_user,
+        account=account,
+    ))
 
 
-@app.route('/authorize/<type>/<account>/on/<user>/with/<other_account>',
+@app.route('/link/<type>/<account>/on/<user>/with/<other_account>',
            methods=['POST'])
-def authorize(type, account, user, other_account):
+def link(type, account, user, other_account):
     if session['account'] != account or \
             session['user'] != user or \
             session['other_account'] != other_account:
@@ -157,7 +201,7 @@ def lookup(name):
 
 
 def _lookup(name):
-    name = name.strip()
+    name = name.strip().lower()
     if not name:
         return {'error': 'invalid'}
 

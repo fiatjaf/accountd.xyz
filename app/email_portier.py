@@ -9,12 +9,11 @@ except SystemError:
     from app import app
 
 PORTIER_BROKER = 'https://broker.portier.io'
-URL = app.config['SERVICE_URL']
 
 
 def handle(user, account):
     nonce = '{}'.format(random.random())
-    redirect = URL + url_for(
+    redirect = app.config['SERVICE_URL'] + url_for(
         '.callback',
         user=user, account=account,
     )
@@ -36,7 +35,7 @@ def handle(user, account):
     '''.format(portier=PORTIER_BROKER,
                email=account,
                redirect=redirect,
-               url=URL,
+               url=app.config['SERVICE_URL'],
                nonce=nonce)
 
 
@@ -45,7 +44,7 @@ def callback(user, account):
         email, _ = get_verified_email(
             broker_url=PORTIER_BROKER,
             token=request.form['id_token'],
-            audience=URL,
+            audience=app.config['SERVICE_URL'],
             issuer=PORTIER_BROKER,
             cache=Cache()
         )
