@@ -10,6 +10,7 @@ try:
     from .helpers import account_type
     from . import email_portier as email
     from . import domain
+    from . import trello
     from . import twitter
     from . import github
 except SystemError:
@@ -17,13 +18,14 @@ except SystemError:
     from helpers import account_type
     import email_portier as email
     import domain
+    import trello
     import twitter
     import github
 
 
 # satisfy flake8
 def x(*args): None
-x(email, domain, twitter, github)
+x(email, domain, trello, twitter, github)
 # ~
 
 
