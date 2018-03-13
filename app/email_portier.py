@@ -4,9 +4,9 @@ from portier.client import get_verified_email
 from flask import session, request, url_for
 
 try:
-    from .app import app
+    from .main import app
 except SystemError:
-    from app import app
+    from main import app
 
 PORTIER_BROKER = 'https://broker.portier.io'
 

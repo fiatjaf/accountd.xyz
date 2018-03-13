@@ -6,9 +6,9 @@ import requests
 from flask import redirect, url_for, request, session
 
 try:
-    from .app import app
+    from .main import app
 except SystemError:
-    from app import app
+    from main import app
 
 consumer_key = os.getenv('TRELLO_KEY')
 consumer_secret = os.getenv('TRELLO_SECRET')

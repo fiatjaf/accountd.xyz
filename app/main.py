@@ -1,37 +1,52 @@
+import os
 import re
 import random
 from urllib import parse
 
-from flask import session, request, redirect, render_template, \
-                  jsonify, url_for
+import jwt
+import psycopg2
+from redis import StrictRedis
+from flask import Flask, session, request, redirect, \
+                  render_template, jsonify, url_for
+
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY')
+app.config['SERVICE_URL'] = os.getenv('SERVICE_URL')
+app.config['PRIVATE_KEY'] = os.getenv('PRIVATE_KEY').replace('\\n', '\n').encode('ascii')
+app.config['PUBLIC_KEY'] = os.getenv('PUBLIC_KEY').replace('\\n', '\n').encode('ascii')
+app.config['DEBUG'] = os.getenv('DEBUG') == 1
+
+r = parse.urlparse(os.getenv('REDIS_URL'))
+redis = StrictRedis(host=r.hostname, port=r.port, password=r.password)
+
+pg = psycopg2.connect(os.getenv('DATABASE_URL'))
 
 try:
-    from .app import app, redis, pg
     from .helpers import account_type
     from . import email_portier as email
     from . import domain
     from . import trello
     from . import twitter
     from . import github
+    from . import test
 except SystemError:
-    from app import app, redis, pg
     from helpers import account_type
     import email_portier as email
     import domain
     import trello
     import twitter
     import github
-
-
-# satisfy flake8
-def x(*args): None
-x(email, domain, trello, twitter, github)
-# ~
+    import test
 
 
 @app.route('/')
 def index():
     return 'hello'
+
+
+@app.route('/public-key')
+def public_key():
+    return app.config['PUBLIC_KEY']
 
 
 @app.route('/login/<user>/with/<account>')
@@ -191,10 +206,13 @@ def link(type, account, user, other_account):
     return return_response(True, user)
 
 
-@app.route('/verify/<code>', methods=['POST'])
-def verify(code):
-    user = redis.get('code:' + code).decode('utf-8')
-    return jsonify(_lookup(user))
+@app.route('/verify/<token>', methods=['POST'])
+def verify(token):
+    try:
+        decoded = jwt.decode(token, app.config['PUBLIC_KEY'], algorithms='RS256')
+        return jsonify(decoded)
+    except jwt.exceptions.InvalidAlgorithmError:
+        return abort(400)
 
 
 @app.route('/lookup/<name>')
@@ -249,22 +267,17 @@ def is_(account, user):
 
 
 def return_response(valid, user):
-    # pass response to external caller
-    if session.get('redirect_uri'):
-        code = int(random.random() * 999999999)
+    token = jwt.encode({'user': user}, app.config['PRIVATE_KEY'], algorithm='RS256')
 
+    if session.get('redirect_uri'):
+        # pass response to external caller
         u = parse.urlparse(session['redirect_uri'])
         qs = parse.parse_qs(u.query)
-        qs['code'] = code
+        qs['token'] = token
         back = u.scheme + '://' + u.netloc + u.path + '?' + parse.urlencode(qs)
-        print(back)
-
-        if valid:
-            redis.setex('code:%s' % code, 180, user)
-
         return redirect(back)
     else:
-        return 'true' if valid else 'false'
+        return token if valid else abort(401)
 
 
 if __name__ == '__main__':

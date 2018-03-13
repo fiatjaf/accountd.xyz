@@ -6,9 +6,9 @@ import oauth2 as oauth
 from flask import redirect, url_for, request, session
 
 try:
-    from .app import app
+    from .main import app
 except SystemError:
-    from app import app
+    from main import app
 
 consumer_key = os.getenv('TWITTER_KEY')
 consumer_secret = os.getenv('TWITTER_SECRET')

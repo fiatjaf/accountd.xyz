@@ -7,9 +7,9 @@ from flask import redirect, url_for, request, session
 import requests
 
 try:
-    from .app import app
+    from .main import app
 except SystemError:
-    from app import app
+    from . import app
 
 consumer_key = os.getenv('GITHUB_KEY')
 consumer_secret = os.getenv('GITHUB_SECRET')

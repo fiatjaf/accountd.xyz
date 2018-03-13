@@ -4,9 +4,9 @@ import requests
 from flask import redirect, url_for, request
 
 try:
-    from .app import app
+    from .main import app
 except SystemError:
-    from app import app
+    from main import app
 
 
 def handle(user, account):
