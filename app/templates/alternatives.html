@@ -5,8 +5,8 @@
 
 <ul>{% for account in alternatives %}
   <li><form
-    action=/login/{{ session.user }}/with/{{ session.account }}>
-    <input type=hidden name=other_account value={{ account }}>
+    action="/login/as/{{ session.user }}/with/{{ session.account }}">
+    <input type=hidden name=alt_account value={{ account }}>
     <button>{{ account }}</button>
   </form></li>{% endfor %}
 </ul>

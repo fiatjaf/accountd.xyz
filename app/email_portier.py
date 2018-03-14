@@ -11,12 +11,9 @@ except SystemError:
 PORTIER_BROKER = 'https://broker.portier.io'
 
 
-def handle(user, account):
+def handle(account):
     nonce = '{}'.format(random.random())
-    redirect = app.config['SERVICE_URL'] + url_for(
-        '.callback',
-        user=user, account=account,
-    )
+    redirect = app.config['SERVICE_URL'] + url_for('.callback', account=account)
 
     cache = Cache()
     cache.set('portier:nonce:%s' % nonce, redirect, 0)
@@ -39,7 +36,7 @@ def handle(user, account):
                nonce=nonce)
 
 
-def callback(user, account):
+def callback(account):
     try:
         email, _ = get_verified_email(
             broker_url=PORTIER_BROKER,

@@ -15,10 +15,8 @@ consumer_key = os.getenv('GITHUB_KEY')
 consumer_secret = os.getenv('GITHUB_SECRET')
 
 
-def handle(user, account):
-    callback = app.config['SERVICE_URL'] + url_for(
-        '.callback', user=user, account=account)
-
+def handle(account):
+    callback = app.config['SERVICE_URL'] + url_for('.callback',account=account) 
     nonce = random.random()
     session['gh:nonce'] = nonce
 
@@ -31,9 +29,8 @@ def handle(user, account):
     )
 
 
-def callback(user, account):
-    callback = app.config['SERVICE_URL'] + url_for(
-        '.callback', user=user, account=account)
+def callback(account):
+    callback = app.config['SERVICE_URL'] + url_for('.callback', account=account)
 
     r = requests.post(
         'https://github.com/login/oauth/access_token',

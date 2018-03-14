@@ -6,11 +6,11 @@ except SystemError:
     from main import app
 
 
-def handle(user, account):
+def handle(account):
     callback = app.config['SERVICE_URL'] + url_for(
-        '.callback', user=user, account=account)
+        '.callback', account=account)
     return redirect(callback)
 
 
-def callback(user, account):
+def callback(account):
     return app.config['DEBUG'] or app.testing

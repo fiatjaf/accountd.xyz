@@ -19,12 +19,11 @@ authorize_url = 'https://api.twitter.com/oauth/authenticate'
 user_url = 'https://api.twitter.com/1.1/account/verify_credentials.json'
 
 
-def handle(user, account):
+def handle(account):
     consumer = oauth.Consumer(consumer_key, consumer_secret)
     client = oauth.Client(consumer)
 
-    callback = app.config['SERVICE_URL'] + url_for(
-        '.callback', user=user, account=account)
+    callback = app.config['SERVICE_URL'] + url_for('.callback', account=account)
 
     resp, content = client.request(
         request_token_url,
@@ -48,7 +47,7 @@ def handle(user, account):
     ))
 
 
-def callback(user, account):
+def callback(account):
     token = oauth.Token(session['tw:rot'], session['tw:rst'])
     del session['tw:rot']
     del session['tw:rst']
@@ -74,5 +73,5 @@ def callback(user, account):
     if resp.status != 200:
         return False
 
-    user = json.loads(content.decode('utf-8'))
-    return user['screen_name'].lower() == account.split('@')[0]
+    userdata = json.loads(content.decode('utf-8'))
+    return userdata['screen_name'].lower() == account.split('@')[0]

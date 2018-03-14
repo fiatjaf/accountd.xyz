@@ -1,5 +1,5 @@
 PORT=443
-SERVICE_URL=https://testaccountd/
+SERVICE_URL=http://localhost
 SECRET_KEY=12345
 DATABASE_URL=postgres://accountd-tester:123456789@localhost:5432/accountd-test
 REDIS_URL=redis://localhost:6379

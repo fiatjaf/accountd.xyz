@@ -18,12 +18,11 @@ access_token_url = 'https://trello.com/1/OAuthGetAccessToken'
 authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
 
 
-def handle(user, account):
+def handle(account):
     consumer = oauth.Consumer(consumer_key, consumer_secret)
     client = oauth.Client(consumer)
 
-    callback = app.config['SERVICE_URL'] + url_for(
-        '.callback', user=user, account=account)
+    callback = app.config['SERVICE_URL'] + url_for('.callback', account=account)
 
     resp, content = client.request(request_token_url, method='POST')
     if resp.status != 200:
@@ -45,7 +44,7 @@ def handle(user, account):
     ))
 
 
-def callback(user, account):
+def callback(account):
     token = oauth.Token(session['trl:rot'], session['trl:rst'])
     del session['trl:rot']
     del session['trl:rst']

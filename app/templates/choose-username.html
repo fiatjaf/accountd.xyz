@@ -1,0 +1,8 @@
+<!doctype html>
+
+<h1>Account {{ session.account }} is authorized, but needs a username.</h1>
+<h2>Choose a username to be linked with that account:</h2>
+<form action="{{ url_for('.authorized') }}" method=get>
+  <input name=user>
+  <button>Ok</button>
+</form>

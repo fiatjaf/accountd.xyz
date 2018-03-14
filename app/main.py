@@ -49,43 +49,49 @@ def public_key():
     return app.config['PUBLIC_KEY']
 
 
-@app.route('/login/<user>/with/<account>')
-@app.route('/login', defaults={'user': None, 'account': None})
-def login(user, account):
-    user = (user or request.args['user']).lower()
+@app.route('/login/with/<account>')
+@app.route('/login/with', defaults={'account': None})
+def login(account):
     account = (account or request.args['account']).lower()
 
-    if not re.match('^[a-z0-9_]+$', user):
-        return 'username must use only ascii letters, numbers and underscores.'
-
-    session['user'] = user
     session['account'] = account
-    session['redirect_uri'] = request.args.get('redirect_uri')
-    session['other_account'] = request.args.get('other_account')
+    session['alt_account'] = session.get('alt_account', request.args.get('alt_account'))
+    session['redirect_uri'] = session.get('redirect_uri', request.args.get('redirect_uri'))
 
-    request_account = session['other_account'] or account
+    request_account = session['alt_account'] or account
     type = account_type(request_account)
 
     try:
-        return globals()[type].handle(user, request_account)
+        return globals()[type].handle(request_account)
     except KeyError:
-        return 'are you {}? what is {}?'.format(user, request_account), 404
+        return 'unsupported provider for {}'.format(request_account), 404
 
 
-@app.route('/callback/<user>/with/<account>', methods=['GET', 'POST'])
-@app.route('/callback', defaults={'user': None, 'account': None})
-def callback(user, account):
-    user = user or request.args['user']
+@app.route('/login/as/<user>/with/<account>')
+@app.route('/login/as', defaults={'user': None, 'account': None})
+def login_specific(user, account):
+    user = (user or request.args['user']).lower()
+
+    session['alt_account'] = request.args.get('alt_account')
+    session['redirect_uri'] = request.args.get('redirect_uri')
+
+    if not username_valid(user):
+        return 'username must use only ascii letters, numbers and underscores.', 400
+
+    session['user'] = user
+    return redirect(app.config['SERVICE_URL'] + url_for('.login', account=account))
+
+
+@app.route('/callback/from/<account>', methods=['GET', 'POST'])
+@app.route('/callback', defaults={'account': None})
+def callback(account):
     account = account or request.args['account']
 
-    if session['user'] != user:
-        return 'wrong user, go to /login first', 403
-
-    if session.get('other_account') == account:
-        # if this exists, it means `other_account` is being used
+    if session.get('alt_account') == account:
+        # if this exists, it means `alt_account` is being used
         # to authorize the new `account` into `user`.
         type = account_type(account)
-        valid = globals()[type].callback(user, account)
+        valid = globals()[type].callback(account)
         if valid:
             return render_template('link-new.html', type=type)
         else:
@@ -95,22 +101,41 @@ def callback(user, account):
         return 'wrong account, go to /login first', 403
 
     type = account_type(account)
-    valid = globals()[type].callback(user, account)
+    valid = globals()[type].callback(account)
 
     if valid:
         session['authorized'] = session.get('authorized', [])
-        session['authorized'].append((user, account))
+        session['authorized'].append(account)
         session.modified = True
 
-        return redirect(app.config['SERVICE_URL'] + url_for(
-            '.authorized', user=user, account=account))
+        return redirect(app.config['SERVICE_URL'] + url_for('.authorized'))
     else:
         return return_response(False, user)
 
 
-@app.route('/authorized/<user>/with/<account>')
-def authorized(user, account):
-    if (user, account) not in session['authorized']:
+@app.route('/authorized')
+def authorized():
+    account = session['account']
+    user = session.get('user', request.args.get('user'))
+
+    if not user:
+        with pg:
+            with pg.cursor() as c:
+                c.execute(
+                    'SELECT user_id FROM accounts '
+                    'WHERE account = %s',
+                    (account,)
+                )
+                if c.rowcount == 0:
+                    return render_template('choose-username.html', account=account)
+                (user,) = c.fetchone()
+
+    if not username_valid(user):
+        return 'username must use only ascii letters, numbers and underscores.', 400
+
+    session['user'] = user
+
+    if account not in session['authorized']:
         return return_response(False, user)
 
     # make link on our database
@@ -154,12 +179,11 @@ def authorized(user, account):
                     alternatives.append(r_account)
 
                 if len(alternatives) == 1:
-                    print(request.url)
                     return redirect(app.config['SERVICE_URL'] + url_for(
-                        '.login',
+                        '.login_specific',
                         user=user, account=account,
                         redirect_uri=session['redirect_uri'],
-                        other_account=alternatives[0]
+                        alt_account=alternatives[0]
                     ))
                 else:
                     return render_template(
@@ -175,22 +199,17 @@ def redirect_user_id(current_user, next_user, account):
         return 'wrong user/account, go to /login first', 403
 
     session['authorized'] = session.get('authorized', [])
-    session['authorized'].append((next_user, account))
+    session['authorized'].append(account)
     session.modified = True
 
-    return redirect(app.config['SERVICE_URL'] + url_for(
-        '.authorized',
-        user=next_user,
-        account=account,
-    ))
+    return redirect(app.config['SERVICE_URL'] + url_for('.authorized'))
 
 
-@app.route('/link/<type>/<account>/on/<user>/with/<other_account>',
-           methods=['POST'])
-def link(type, account, user, other_account):
+@app.route('/link/<account>/on/<user>/with/<alt_account>', methods=['POST'])
+def link(account, user, alt_account):
     if session['account'] != account or \
             session['user'] != user or \
-            session['other_account'] != other_account:
+            session['alt_account'] != alt_account:
         return 'wrong user/account, go to /login first', 403
 
     with pg:
@@ -251,21 +270,6 @@ def _lookup(name):
                 }
 
 
-@app.route('/is/<account>/<user>')
-def is_(account, user):
-    with pg:
-        with pg.cursor() as c:
-            c.execute(
-                'SELECT user_id FROM accounts '
-                'WHERE account = %s AND user_id = %s',
-                (account, user)
-            )
-            if c.rowcount:
-                return jsonify(True)
-            else:
-                return jsonify(False)
-
-
 def return_response(valid, user):
     token = jwt.encode({'user': user}, app.config['PRIVATE_KEY'], algorithm='RS256')
 
@@ -278,6 +282,10 @@ def return_response(valid, user):
         return redirect(back)
     else:
         return token if valid else abort(401)
+
+
+def username_valid(user):
+    return re.match('^[a-z0-9_]+$', user)
 
 
 if __name__ == '__main__':

@@ -1,9 +1,14 @@
 <!doctype html>
 
-<h1>Logged as {{ session.user }} with {{ session.other_account }}</h1>
+<h1>Logged as {{ session.user }} with {{ session.alt_account }}</h1>
 <h2>Authorize {{ session.account }} as a valid account under your control?</h2>
 <form
-  action=/link/{{type}}/{{session.account}}/on/{{session.user}}/with/{{session.other_account}}
+  action="{{ url_for(
+    '.link',
+    account=session.account,
+    user=session.user,
+    alt_account=session.alt_account
+  ) }}"
   method=post>
   <button>I'm ok with that</button>
 </form>
