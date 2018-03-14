@@ -24,7 +24,18 @@ class TestAuthFlow(TestCase):
             c.execute('''insert into accounts values ('x@muza.com', 'xamuza')''')
         pg.commit()
 
+        # query with the username
         r = self.app.get('/lookup/xamuza')
+        user = json.loads(r.data.decode('utf-8'))
+        self.assertEqual(user['id'], 'xamuza')
+        self.assertEqual(len(user['accounts']), 2)
+        self.assertEqual(user['accounts'][0]['type'], 'domain')
+        self.assertEqual(user['accounts'][0]['account'], 'xamuza.com')
+        self.assertEqual(user['accounts'][1]['type'], 'email')
+        self.assertEqual(user['accounts'][1]['account'], 'x@muza.com')
+
+        # query with the account
+        r = self.app.get('/lookup/xamuza.com')
         user = json.loads(r.data.decode('utf-8'))
         self.assertEqual(user['id'], 'xamuza')
         self.assertEqual(len(user['accounts']), 2)
@@ -138,7 +149,7 @@ class TestAuthFlow(TestCase):
         self.assertEqual(r.status_code, 200)
 
         # test the lookup endpoint
-        r = self.app.get('/lookup/banana')
+        r = self.app.get('/lookup/b2@test')
         user = json.loads(r.data.decode('utf-8'))
         self.assertEqual(user['id'], 'banana')
         self.assertEqual(len(user['accounts']), 2)

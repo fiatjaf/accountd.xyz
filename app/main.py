@@ -248,7 +248,11 @@ def _lookup(name):
         with pg.cursor() as c:
             c.execute(
                 'SELECT user_id, account FROM accounts '
-                'WHERE user_id = %s OR account = %s',
+                'WHERE user_id = ('
+                    'SELECT user_id FROM accounts '
+                    'WHERE user_id = %s OR account = %s '
+                    'LIMIT 1'
+                ')',
                 (name, name)
             )
 
