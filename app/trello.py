@@ -17,12 +17,13 @@ request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
 access_token_url = 'https://trello.com/1/OAuthGetAccessToken'
 authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
 
+def redir():
+    return app.config['SERVICE_URL'] + url_for('.callback', provider='trello')
 
-def handle(account):
+
+def handle():
     consumer = oauth.Consumer(consumer_key, consumer_secret)
     client = oauth.Client(consumer)
-
-    callback = app.config['SERVICE_URL'] + url_for('.callback', account=account)
 
     resp, content = client.request(request_token_url, method='POST')
     if resp.status != 200:
@@ -37,14 +38,14 @@ def handle(account):
         authorize_url,
         data['oauth_token'],
         urlencode({
-            'return_url': callback,
+            'return_url': redir(),
             'expiration': '1hour',
             'name': 'accountd.xyz',
         })
     ))
 
 
-def callback(account):
+def callback():
     token = oauth.Token(session['trl:rot'], session['trl:rst'])
     del session['trl:rot']
     del session['trl:rst']
@@ -75,4 +76,4 @@ def callback(account):
         })
     )
 
-    return r.json()['username'].lower() == account.split('@')[0]
+    return r.json()['username'].lower() + '@trello'

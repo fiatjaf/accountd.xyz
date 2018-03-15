@@ -1,9 +1,8 @@
-<!doctype html>
+{% extends 'base.html' %}
 
-<h1>Trying to login as {{ session.user }} with {{ session.account }}</h1>
-<h2>The account {{ session.account }} is already tied to the id {{ r_user }}. We can login with that instead. Are you ok with that?</h2>
-<form
-  action="/redirect/{{ session.user }}/to/{{ r_user }}/with/{{ session.account }}"
-  method=get>
+{% block content %}
+<h1>You're trying to login as {{ user }}, but the account {{ account }} is already tied to the user {{ r_user }}. Do you want to login as {{ r_user }}?</h1>
+<form action="{{ url_for('.authorized', account=account) }}" method=get>
   <button>login as {{ r_user }}</button>
 </form>
+{% endblock %}

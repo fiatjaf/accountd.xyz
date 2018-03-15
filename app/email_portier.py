@@ -1,7 +1,7 @@
 import random
 
 from portier.client import get_verified_email
-from flask import session, request, url_for
+from flask import session, request, url_for, g
 
 try:
     from .main import app
@@ -11,9 +11,10 @@ except SystemError:
 PORTIER_BROKER = 'https://broker.portier.io'
 
 
-def handle(account):
+def handle():
+    email = g.account
     nonce = '{}'.format(random.random())
-    redirect = app.config['SERVICE_URL'] + url_for('.callback', account=account)
+    redirect = app.config['SERVICE_URL'] + url_for('.callback', provider='email')
 
     cache = Cache()
     cache.set('portier:nonce:%s' % nonce, redirect, 0)
@@ -30,13 +31,13 @@ def handle(account):
 </form>
 <script>document.getElementById('form').submit()</script>
     '''.format(portier=PORTIER_BROKER,
-               email=account,
+               email=email,
                redirect=redirect,
                url=app.config['SERVICE_URL'],
                nonce=nonce)
 
 
-def callback(account):
+def callback():
     try:
         email, _ = get_verified_email(
             broker_url=PORTIER_BROKER,
@@ -48,7 +49,7 @@ def callback(account):
     except RuntimeError as exc:
         raise exc
 
-    return email == account
+    return email
 
 
 class Cache(object):

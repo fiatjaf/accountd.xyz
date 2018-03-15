@@ -1,5 +1,4 @@
 import os
-import re
 import random
 from urllib import parse
 
@@ -7,7 +6,8 @@ import jwt
 import psycopg2
 from redis import StrictRedis
 from flask import Flask, session, request, redirect, \
-                  render_template, jsonify, url_for
+                  render_template, jsonify, url_for, \
+                  make_response, g
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
@@ -22,7 +22,7 @@ redis = StrictRedis(host=r.hostname, port=r.port, password=r.password)
 pg = psycopg2.connect(os.getenv('DATABASE_URL'))
 
 try:
-    from .helpers import account_type
+    from .helpers import account_type, username_valid
     from . import email_portier as email
     from . import domain
     from . import trello
@@ -30,7 +30,7 @@ try:
     from . import github
     from . import test
 except SystemError:
-    from helpers import account_type
+    from helpers import account_type, username_valid
     import email_portier as email
     import domain
     import trello
@@ -41,83 +41,92 @@ except SystemError:
 
 @app.route('/')
 def index():
-    return 'hello'
+    return render_template('landing.html')
 
 
 @app.route('/public-key')
 def public_key():
-    return app.config['PUBLIC_KEY']
+    resp = make_response(app.config['PUBLIC_KEY'])
+    resp.headers['Content-Type'] = 'text/plain'
+    return resp
 
 
-@app.route('/login/with/<account>')
-@app.route('/login/with', defaults={'account': None})
-def login(account):
-    account = (account or request.args['account']).lower()
+@app.route('/login/using/<provider>', defaults={'user': None, 'account': None})
+@app.route('/login/as/<user>/using/<provider>', defaults={'account': None})
+@app.route('/login/with/<account>', defaults={'user': None, 'provider': None})
+@app.route('/login/as/<user>/with/<account>', defaults={'provider': None})
+@app.route('/login', defaults={'provider': None, 'user': None, 'account': None})
+def login_using(provider, user, account):
+    user = user or request.args.get('user')
+    account = account or request.args.get('account')
+    provider = provider or request.args.get('provider')
+    initial_account = request.args.get('initial_account')
 
-    session['account'] = account
-    session['alt_account'] = session.get('alt_account', request.args.get('alt_account'))
-    session['redirect_uri'] = session.get('redirect_uri', request.args.get('redirect_uri'))
+    if user:
+        if not username_valid(user):
+            return 'username must use only ascii letters, numbers and underscores.', 400
 
-    request_account = session['alt_account'] or account
-    type = account_type(request_account)
+        session['desired_user'] = user
+
+    if account:
+        session['desired_account'] = account
+
+    if initial_account:
+        session['initial_account'] = initial_account
+
+    if not provider:
+        provider = account_type(account)
+        g.account = account
 
     try:
-        return globals()[type].handle(request_account)
+        handle = globals()[provider].handle
     except KeyError:
-        return 'unsupported provider for {}'.format(request_account), 404
+        return 'unsupported provider {}'.format(provider), 404
+
+    return handle()
 
 
-@app.route('/login/as/<user>/with/<account>')
-@app.route('/login/as', defaults={'user': None, 'account': None})
-def login_specific(user, account):
-    user = (user or request.args['user']).lower()
+@app.route('/callback/from/<provider>',
+    endpoint='callback',
+    defaults={'account': None},
+    methods=['GET', 'POST'])
+@app.route('/callback', defaults={'provider': None, 'account': None})
+@app.route('/authorized/<account>', endpoint='authorized', defaults={'provider': None})
+def callback(provider, account):
+    if provider:
+        account = globals()[provider].callback()
+    elif not account:
+        return abort(400)
 
-    session['alt_account'] = request.args.get('alt_account')
-    session['redirect_uri'] = request.args.get('redirect_uri')
+    if not account:
+        return 'could not authenticate with {}'.format(provider), 403
 
-    if not username_valid(user):
-        return 'username must use only ascii letters, numbers and underscores.', 400
-
-    session['user'] = user
-    return redirect(app.config['SERVICE_URL'] + url_for('.login', account=account))
-
-
-@app.route('/callback/from/<account>', methods=['GET', 'POST'])
-@app.route('/callback', defaults={'account': None})
-def callback(account):
-    account = account or request.args['account']
-
-    if session.get('alt_account') == account:
-        # if this exists, it means `alt_account` is being used
-        # to authorize the new `account` into `user`.
-        type = account_type(account)
-        valid = globals()[type].callback(account)
-        if valid:
-            return render_template('link-new.html', type=type)
-        else:
-            return '0'
-
-    if session['account'] != account:
-        return 'wrong account, go to /login first', 403
-
-    type = account_type(account)
-    valid = globals()[type].callback(account)
-
-    if valid:
-        session['authorized'] = session.get('authorized', [])
-        session['authorized'].append(account)
+    if session.get('desired_account', account) != account:
+        return 'you wanted to login as {}, but logged as {}'.format(
+            session['desired_account'],
+            account
+        ), 403
+    try:
+        del session['desired_account']
         session.modified = True
+    except:
+        pass
 
-        return redirect(app.config['SERVICE_URL'] + url_for('.authorized'))
-    else:
-        return return_response(False, user)
+    session['authorized_accounts'] = session.get('authorized_accounts', {})
+    session['authorized_accounts'][account] = True
+    session.modified = True
 
+    # now we need a username
+    # let's see if one was supplied by the visitor
+    user = session.get('desired_user', request.args.get('user'))
+    try:
+        del session['desired_user']
+        session.modified = True
+    except:
+        pass
 
-@app.route('/authorized')
-def authorized():
-    account = session['account']
-    user = session.get('user', request.args.get('user'))
-
+    # if not, we'll check in the database for a previous user that has
+    # used this same account (common)
     if not user:
         with pg:
             with pg.cursor() as c:
@@ -133,12 +142,18 @@ def authorized():
     if not username_valid(user):
         return 'username must use only ascii letters, numbers and underscores.', 400
 
-    session['user'] = user
+    if 'initial_account' in session:
+        # if this exists, it means `account` is being used to authorize
+        # `initial_account` into `user`
+        initial_account = session.pop('initial_account')
+        session.modified = True
 
-    if account not in session['authorized']:
-        return return_response(False, user)
+        # from now on we just use the initial_account as the account
+        # (so it can be linked in the next section)
+        account = initial_account
 
-    # make link on our database
+    # here we'll have a valid username and one account that has just been authorized
+    # link them up
     with pg:
         with pg.cursor() as c:
             c.execute(
@@ -154,7 +169,7 @@ def authorized():
                     'VALUES (%s, %s)',
                     (user, account)
                 )
-                return return_response(True, user)
+                return return_user_token(user)
 
             else:
                 # this user is already registered
@@ -166,15 +181,27 @@ def authorized():
                     if r_account == account:
                         if r_user == user:
                             # this same account has been registered
-                            # so everything is fine
-                            return return_response(True, user)
+                            # so everything is fine (common)
+                            return return_user_token(user)
                         else:
                             # this account was registered with a
-                            # different user, let's prompt the user
+                            # different user, let's see if the vistor
+                            # wants to login with his old username
                             return render_template(
                                 'prompt_user.html',
-                                r_user=r_user
+                                r_user=r_user,
+                                user=user,
+                                account=account
                             )
+                    elif r_account in session['authorized_accounts']:
+                        # the visitor has already authorized with one
+                        # of his old accounts, so everything is fine
+                        c.execute(
+                            'INSERT INTO accounts (user_id, account) '
+                            'VALUES (%s, %s)',
+                            (user, account)
+                        )
+                        return return_user_token(user)
 
                     alternatives.append(r_account)
 
@@ -188,7 +215,9 @@ def authorized():
                 else:
                     return render_template(
                         'alternatives.html',
-                        alternatives=alternatives
+                        alternatives=alternatives,
+                        user=user,
+                        account=account
                     )
 
 
@@ -222,7 +251,7 @@ def link(account, user, alt_account):
                 (account, user, user)
             )
 
-    return return_response(True, user)
+    return return_user_token(user)
 
 
 @app.route('/verify/<token>', methods=['POST'])
@@ -274,7 +303,7 @@ def _lookup(name):
                 }
 
 
-def return_response(valid, user):
+def return_user_token(user):
     token = jwt.encode({'user': user}, app.config['PRIVATE_KEY'], algorithm='RS256')
 
     if session.get('redirect_uri'):
@@ -284,12 +313,8 @@ def return_response(valid, user):
         qs['token'] = token
         back = u.scheme + '://' + u.netloc + u.path + '?' + parse.urlencode(qs)
         return redirect(back)
-    else:
-        return token if valid else abort(401)
 
-
-def username_valid(user):
-    return re.match('^[a-z0-9_]+$', user)
+    return token
 
 
 if __name__ == '__main__':

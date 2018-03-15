@@ -1,12 +1,15 @@
-<!doctype html>
+{% extends 'base.html' %}
 
-<h1>Trying to login as {{ session.user }} with {{ session.account }}</h1>
+{% block content %}
+<h1>Trying to login as {{ user }} with {{ account }}</h1>
 <h2>To authorize that, choose an account:</h2>
 
-<ul>{% for account in alternatives %}
-  <li><form
-    action="/login/as/{{ session.user }}/with/{{ session.account }}">
-    <input type=hidden name=alt_account value={{ account }}>
-    <button>{{ account }}</button>
+<ul>{% for acc in alternatives %}
+  <li><form action="/login">
+    <input type=hidden name=account value={{ acc }}>
+    <input type=hidden name=initial_account value={{ account }}>
+    <input type=hidden name=user value={{ user }}>
+    <button>{{ acc }}</button>
   </form></li>{% endfor %}
 </ul>
+{% endblock %}

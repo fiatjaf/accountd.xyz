@@ -19,3 +19,7 @@ def account_type(account):
     # otherwise it is a silo, to which we'll proceed using
     return provider
     # 'github', 'twitter', 'instagram' etc.
+
+
+def username_valid(user):
+    return re.match('^[a-z0-9_]+$', user)

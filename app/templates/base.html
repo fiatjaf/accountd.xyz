@@ -1,0 +1,39 @@
+<!doctype html>
+
+<meta charset=utf-8>
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<title>{{ title or 'accountd.xyz' }}</title>
+
+<header>
+  <h1>accountd.xyz</h1>
+</header>
+
+<main>
+  {% if session.authorized_users %}
+  <section>
+    <h1>You're logged in as:</h1>
+    <ul>{% for u in session.authorized_users %}
+      <li>{{ u }}</li>
+    {% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if session.authorized_accounts %}
+  <section>
+    <h1>You've authorized the following accounts:</h1>
+    <ul>{% for acc in session.authorized_accounts %}
+      <li>{{ acc }}</li>
+    {% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <section>
+  {% block content %}
+  {% endblock %}
+  </section>
+</main>
+
+<footer>
+
+</footer>

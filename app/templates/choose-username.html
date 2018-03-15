@@ -1,8 +1,9 @@
-<!doctype html>
+{% extends 'base.html' %}
 
-<h1>Account {{ session.account }} is authorized, but needs a username.</h1>
-<h2>Choose a username to be linked with that account:</h2>
-<form action="{{ url_for('.authorized') }}" method=get>
+{% block content %}
+<h1>Choose a username to link all your accounts with:</h2>
+<form action="{{ url_for('.authorized', account=account) }}" method=get>
   <input name=user>
   <button>Ok</button>
 </form>
+{% endblock %}
