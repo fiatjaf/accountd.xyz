@@ -1,5 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
-hello!
+<div>
+  <h1>Associate a username with an account:</h1>
+  <form method=get action=/login>
+    <label>
+      username:
+      <input name=user>
+      <p>the username that will uniquely identify you and tie up all your accounts</p>
+    </label>
+    <label>
+      account:
+      <input name=account>
+      <p>an account identifier: could be an <em>email address</em>,
+         a <em>domain name</em> or a string
+         in the format <em>name@provider</em></p>
+    </label>
+    <button>Ok</button>
+  </form>
+</div>
+<div>
+  <h1>Supported providers:</h1>
+  <ul>{% for p in providers %}
+    <li>{{ p }}</li>
+  {% endfor %}</ul>
+</div>
 {% endblock %}

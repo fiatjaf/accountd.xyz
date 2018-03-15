@@ -41,7 +41,13 @@ except SystemError:
 
 @app.route('/')
 def index():
-    return render_template('landing.html')
+    return render_template('landing.html', providers=[
+      'email',
+      'twitter',
+      'github',
+      'trello',
+      'domain'
+    ])
 
 
 @app.route('/public-key')
