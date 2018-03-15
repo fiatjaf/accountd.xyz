@@ -327,7 +327,9 @@ def return_user_token(user):
         back = u.scheme + '://' + u.netloc + u.path + '?' + parse.urlencode(qs)
         return redirect(back)
 
-    return token
+    resp = make_response(token)
+    resp.headers['Content-Type'] = 'text/plain'
+    return resp
 
 
 if __name__ == '__main__':
