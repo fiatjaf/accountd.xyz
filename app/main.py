@@ -54,13 +54,18 @@ def public_key():
 @app.route('/login/using/<provider>', defaults={'user': None, 'account': None})
 @app.route('/login/as/<user>/using/<provider>', defaults={'account': None})
 @app.route('/login/with/<account>', defaults={'user': None, 'provider': None})
-@app.route('/login/as/<user>/with/<account>', defaults={'provider': None})
+@app.route('/login/as/<user>/with/<account>',
+    endpoint='login_specific',
+    defaults={'provider': None})
 @app.route('/login', defaults={'provider': None, 'user': None, 'account': None})
-def login_using(provider, user, account):
+def login(provider, user, account):
     user = user or request.args.get('user')
     account = account or request.args.get('account')
     provider = provider or request.args.get('provider')
     initial_account = request.args.get('initial_account')
+
+    if 'redirect_uri' in request.args:
+        session['redirect_uri'] = request.args['redirect_uri']
 
     if user:
         if not username_valid(user):
@@ -208,9 +213,10 @@ def callback(provider, account):
                 if len(alternatives) == 1:
                     return redirect(app.config['SERVICE_URL'] + url_for(
                         '.login_specific',
-                        user=user, account=account,
-                        redirect_uri=session['redirect_uri'],
-                        alt_account=alternatives[0]
+                        redirect_uri=session.pop('redirect_uri', ''),
+                        user=user,
+                        account=alternatives[0],
+                        initial_account=account
                     ))
                 else:
                     return render_template(
@@ -306,9 +312,10 @@ def _lookup(name):
 def return_user_token(user):
     token = jwt.encode({'user': user}, app.config['PRIVATE_KEY'], algorithm='RS256')
 
-    if session.get('redirect_uri'):
+    redirect_uri = session.pop('redirect_uri', '')
+    if redirect_uri:
         # pass response to external caller
-        u = parse.urlparse(session['redirect_uri'])
+        u = parse.urlparse(redirect_uri)
         qs = parse.parse_qs(u.query)
         qs['token'] = token
         back = u.scheme + '://' + u.netloc + u.path + '?' + parse.urlencode(qs)
