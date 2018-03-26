@@ -209,7 +209,7 @@ def callback(provider, account):
                         # of his old accounts, so everything is fine
                         c.execute(
                             'INSERT INTO accounts (user_id, account) '
-                            'VALUES (%s, %s)',
+                            'VALUES (%s, %s) ON CONFLICT DO NOTHING',
                             (user, account)
                         )
                         return return_user_token(user)
