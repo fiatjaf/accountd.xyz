@@ -53,6 +53,9 @@ def callback():
         raise Exception('failed to fetch access token from github.')
 
     token = r.json().get('access_token')
+    if not token:
+        raise Exception('github hasn\'t issued a token to us for some reason: ' + r.text)
+
     r = requests.get(
         'https://api.github.com/user',
         headers={
@@ -64,6 +67,6 @@ def callback():
     )
 
     if not r.ok:
-        raise Exception('failed to fetch user login from github after oauth.')
+        raise Exception('failed to fetch user login from github after oauth.', r.text)
 
     return r.json()['login'] + '@github' 
