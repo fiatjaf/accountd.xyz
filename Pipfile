@@ -1,0 +1,34 @@
+[[source]]
+name = "pypi"
+verify_ssl = true
+url = "https://pypi.org/simple"
+
+[dev-packages]
+
+[packages]
+"asn1crypto" = "*"
+certifi = "*"
+cffi = "*"
+chardet = "*"
+click = "*"
+cryptography = "*"
+gunicorn = "*"
+"httplib2" = "*"
+idna = "*"
+itsdangerous = "*"
+"oauth2" = "*"
+portier-python = "*"
+"psycopg2" = "*"
+pycparser = "*"
+redis = "*"
+requests = "*"
+six = "*"
+"urllib3" = "*"
+Flask = "*"
+"Jinja2" = "*"
+MarkupSafe = "*"
+PyJWT = "*"
+Werkzeug = "*"
+
+[requires]
+python_version = "3.5"
