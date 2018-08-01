@@ -7,6 +7,7 @@ def account_type(account):
             return 'phone'
         if len(account.split('.')) > 1:
             return 'domain'
+        return None
 
     # otherwise the account is in format <username>@<provider>
     name, provider = account.split('@')

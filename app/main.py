@@ -7,7 +7,7 @@ import psycopg2
 from redis import StrictRedis
 from flask import Flask, session, request, redirect, \
                   render_template, jsonify, url_for, \
-                  make_response, g
+                  make_response, g, abort
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
@@ -55,6 +55,15 @@ def public_key():
     resp = make_response(app.config['PUBLIC_KEY'])
     resp.headers['Content-Type'] = 'text/plain'
     return resp
+
+
+@app.route('/login-screen')
+def login_screen():
+    return render_template('login-screen.html',
+        destination=request.args.get('site_name') or \
+                    request.args.get('redirect_uri') or \
+                    'a website'
+    )
 
 
 @app.route('/login/using/<provider>', defaults={'user': None, 'account': None})
