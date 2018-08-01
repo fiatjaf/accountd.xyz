@@ -4,6 +4,7 @@ from urllib import parse
 
 import jwt
 import psycopg2
+from jwcrypto import jwk as jwcrypto_jwk
 from redis import StrictRedis
 from flask import Flask, session, request, redirect, \
                   render_template, jsonify, url_for, \
@@ -52,8 +53,14 @@ def index():
 
 @app.route('/public-key')
 def public_key():
-    resp = make_response(app.config['PUBLIC_KEY'])
-    resp.headers['Content-Type'] = 'text/plain'
+    pem = app.config['PUBLIC_KEY']
+    if request.headers.get('Accept') == 'application/json':
+        jwk = jwcrypto_jwk.JWK.from_pem(pem)
+        resp = make_response(jwk.export())
+        resp.headers['Content-Type'] = 'application/json'
+    else:
+        resp = make_response(pem)
+        resp.headers['Content-Type'] = 'text/plain'
     return resp
 
 

@@ -29,6 +29,8 @@ Flask = "*"
 MarkupSafe = "*"
 PyJWT = "*"
 Werkzeug = "*"
+python-jwt = "*"
+jwcrypto = "*"
 
 [requires]
 python_version = "3.5"
