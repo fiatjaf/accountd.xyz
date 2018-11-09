@@ -25,4 +25,14 @@
     <li>{{ p }}</li>
   {% endfor %}</ul>
 </div>
+<div>
+  <h1>API</h1>
+  <p>/login-screen</p>
+  <p>/login/using/:provider</p>
+  <p>/login/as/:user_id/using/:provider</p>
+  <p>/login/with/:provider_account</p>
+  <p>/login/as/:user_id/with/:provider_account</p>
+  <p>/login</p>
+  <p>all options accept the query parameter ?redirect_uri and, if not provided in the URL, ?provider=:provider&user=:user_id&account=:provider_account</p>
+</div>
 {% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Trying to login to {{ destination }}</h1>
+<h2>Use one of the providers below:</h2>
+
+  {% for provider in ['twitter', 'github', 'trello'] %}
+  <form action="/login/using/{{ provider }}" method="GET">
+    <input type="hidden" name="redirect_uri" value="{{ request.args.redirect_uri }}">
+    <button type="submit">{{ provider }}</button>
+  </form>
+  {% endfor %}
+
+  <form action="/login">
+    <input type="hidden" name="redirect_uri" value="{{ request.args.redirect_uri }}">
+    <input name="account" type="email" placeholder="your@email.com">
+    <button type="submit">ok</button>
+  </form>
+{% endblock %}

@@ -332,7 +332,10 @@ def _lookup(name):
 
 
 def return_user_token(user):
-    token = jwt.encode({'user': user}, app.config['PRIVATE_KEY'], algorithm='RS256')
+    token = jwt.encode({
+        'user': user,
+        'role': 'accountd_user'
+    }, app.config['PRIVATE_KEY'], algorithm='RS256')
 
     redirect_uri = session.pop('redirect_uri', '')
     if redirect_uri:
