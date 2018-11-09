@@ -10,16 +10,17 @@ try:
 except SystemError:
     from main import app
 
-consumer_key = os.getenv('TWITTER_KEY')
-consumer_secret = os.getenv('TWITTER_SECRET')
+consumer_key = os.getenv("TWITTER_KEY")
+consumer_secret = os.getenv("TWITTER_SECRET")
 
-request_token_url = 'https://api.twitter.com/oauth/request_token'
-access_token_url = 'https://api.twitter.com/oauth/access_token'
-authorize_url = 'https://api.twitter.com/oauth/authenticate'
-user_url = 'https://api.twitter.com/1.1/account/verify_credentials.json'
+request_token_url = "https://api.twitter.com/oauth/request_token"
+access_token_url = "https://api.twitter.com/oauth/access_token"
+authorize_url = "https://api.twitter.com/oauth/authenticate"
+user_url = "https://api.twitter.com/1.1/account/verify_credentials.json"
+
 
 def redir():
-    return app.config['SERVICE_URL'] + url_for('.callback', provider='twitter')
+    return app.config["SERVICE_URL"] + url_for(".callback", provider="twitter")
 
 
 def handle():
@@ -27,52 +28,48 @@ def handle():
     client = oauth.Client(consumer)
 
     resp, content = client.request(
-        request_token_url,
-        method='POST',
-        body=urlencode({
-            'oauth_callback': redir()
-        })
+        request_token_url, method="POST", body=urlencode({"oauth_callback": redir()})
     )
     if resp.status != 200:
-        raise Exception('Twitter has replied with {}: {}'.format(
-            resp.status, content.decode('utf-8')
-        ))
+        raise Exception(
+            "Twitter has replied with {}: {}".format(
+                resp.status, content.decode("utf-8")
+            )
+        )
 
-    data = dict(parse_qsl(content.decode('utf-8')))
-    session['tw:rot'] = data['oauth_token']
-    session['tw:rst'] = data['oauth_token_secret']
+    data = dict(parse_qsl(content.decode("utf-8")))
+    session["tw:rot"] = data["oauth_token"]
+    session["tw:rst"] = data["oauth_token_secret"]
 
-    return redirect('{0}?oauth_token={1}'.format(
-        authorize_url,
-        data['oauth_token']
-    ))
+    return redirect("{0}?oauth_token={1}".format(authorize_url, data["oauth_token"]))
 
 
 def callback():
-    token = oauth.Token(session['tw:rot'], session['tw:rst'])
-    del session['tw:rot']
-    del session['tw:rst']
+    token = oauth.Token(session["tw:rot"], session["tw:rst"])
+    del session["tw:rot"]
+    del session["tw:rst"]
 
     data = dict(parse_qsl(urlparse(request.url).query))
-    token.set_verifier(data['oauth_verifier'])
+    token.set_verifier(data["oauth_verifier"])
 
     consumer = oauth.Consumer(consumer_key, consumer_secret)
     client = oauth.Client(consumer, token)
-    resp, content = client.request(access_token_url, 'POST')
+    resp, content = client.request(access_token_url, "POST")
     if resp.status != 200:
-        raise Exception('Twitter has replied with {}: {}'.format(
-            resp.status, content.decode('utf-8')
-        ))
+        raise Exception(
+            "Twitter has replied with {}: {}".format(
+                resp.status, content.decode("utf-8")
+            )
+        )
 
-    access = dict(parse_qsl(content.decode('utf-8')))
+    access = dict(parse_qsl(content.decode("utf-8")))
 
-    client = oauth.Client(consumer, oauth.Token(
-        access['oauth_token'],
-        access['oauth_token_secret']
-    ))
-    resp, content = client.request(user_url, 'GET')
+    client = oauth.Client(
+        consumer, oauth.Token(access["oauth_token"], access["oauth_token_secret"])
+    )
+    resp, content = client.request(user_url, "GET")
     if resp.status != 200:
         return False
 
-    userdata = json.loads(content.decode('utf-8'))
-    return userdata['screen_name'].lower() + '@twitter'
+    userdata = json.loads(content.decode("utf-8"))
+    return userdata["screen_name"].lower() + "@twitter"

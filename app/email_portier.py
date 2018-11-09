@@ -8,18 +8,18 @@ try:
 except SystemError:
     from main import app
 
-PORTIER_BROKER = 'https://broker.portier.io'
+PORTIER_BROKER = "https://broker.portier.io"
 
 
 def handle():
     email = g.account
-    nonce = '{}'.format(random.random())
-    redirect = app.config['SERVICE_URL'] + url_for('.callback', provider='email')
+    nonce = "{}".format(random.random())
+    redirect = app.config["SERVICE_URL"] + url_for(".callback", provider="email")
 
     cache = Cache()
-    cache.set('portier:nonce:%s' % nonce, redirect, 0)
+    cache.set("portier:nonce:%s" % nonce, redirect, 0)
 
-    return '''
+    return """
 <form id="form" action="{portier}/auth" method="post" style="display:none;">
   <input name="login_hint" value="{email}">
   <input name="scope" value="openid email">
@@ -30,21 +30,23 @@ def handle():
   <input name="nonce" value="{nonce}">
 </form>
 <script>document.getElementById('form').submit()</script>
-    '''.format(portier=PORTIER_BROKER,
-               email=email,
-               redirect=redirect,
-               url=app.config['SERVICE_URL'],
-               nonce=nonce)
+    """.format(
+        portier=PORTIER_BROKER,
+        email=email,
+        redirect=redirect,
+        url=app.config["SERVICE_URL"],
+        nonce=nonce,
+    )
 
 
 def callback():
     try:
         email, _ = get_verified_email(
             broker_url=PORTIER_BROKER,
-            token=request.form['id_token'],
-            audience=app.config['SERVICE_URL'],
+            token=request.form["id_token"],
+            audience=app.config["SERVICE_URL"],
             issuer=PORTIER_BROKER,
-            cache=Cache()
+            cache=Cache(),
         )
     except RuntimeError as exc:
         raise exc
@@ -54,10 +56,10 @@ def callback():
 
 class Cache(object):
     def get(self, key):
-        return session.get('pc:' + key)
+        return session.get("pc:" + key)
 
     def set(self, key, value, timeout):
-        session['pc:' + key] = value
+        session["pc:" + key] = value
 
     def delete(self, key):
-        session.pop('pc:' + key)
+        session.pop("pc:" + key)

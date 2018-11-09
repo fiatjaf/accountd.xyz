@@ -6,21 +6,32 @@ import jwt
 import psycopg2
 from jwcrypto import jwk as jwcrypto_jwk
 from redis import StrictRedis
-from flask import Flask, session, request, redirect, \
-                  render_template, jsonify, url_for, \
-                  make_response, g, abort
+from flask import (
+    Flask,
+    session,
+    request,
+    redirect,
+    render_template,
+    jsonify,
+    url_for,
+    make_response,
+    g,
+    abort,
+)
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
-app.config['SERVICE_URL'] = os.getenv('SERVICE_URL')
-app.config['PRIVATE_KEY'] = os.getenv('PRIVATE_KEY').replace('\\n', '\n').encode('ascii')
-app.config['PUBLIC_KEY'] = os.getenv('PUBLIC_KEY').replace('\\n', '\n').encode('ascii')
-app.config['DEBUG'] = os.getenv('DEBUG') == 1
+app.secret_key = os.getenv("SECRET_KEY")
+app.config["SERVICE_URL"] = os.getenv("SERVICE_URL")
+app.config["PRIVATE_KEY"] = (
+    os.getenv("PRIVATE_KEY").replace("\\n", "\n").encode("ascii")
+)
+app.config["PUBLIC_KEY"] = os.getenv("PUBLIC_KEY").replace("\\n", "\n").encode("ascii")
+app.config["DEBUG"] = os.getenv("DEBUG") == 1
 
-r = parse.urlparse(os.getenv('REDIS_URL'))
+r = parse.urlparse(os.getenv("REDIS_URL"))
 redis = StrictRedis(host=r.hostname, port=r.port, password=r.password)
 
-pg = psycopg2.connect(os.getenv('DATABASE_URL'))
+pg = psycopg2.connect(os.getenv("DATABASE_URL"))
 
 try:
     from .helpers import account_type, username_valid
@@ -40,66 +51,65 @@ except SystemError:
     import test
 
 
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('landing.html', providers=[
-      'email',
-      'twitter',
-      'github',
-      'trello',
-      'domain'
-    ])
-
-
-@app.route('/public-key')
-def public_key():
-    pem = app.config['PUBLIC_KEY']
-    if request.headers.get('Accept') == 'application/json':
-        jwk = jwcrypto_jwk.JWK.from_pem(pem)
-        resp = make_response(jwk.export())
-        resp.headers['Content-Type'] = 'application/json'
-    else:
-        resp = make_response(pem)
-        resp.headers['Content-Type'] = 'text/plain'
-    return resp
-
-
-@app.route('/login-screen')
-def login_screen():
-    return render_template('login-screen.html',
-        destination=request.args.get('site_name') or \
-                    request.args.get('redirect_uri') or \
-                    'a website'
+    return render_template(
+        "landing.html", providers=["email", "twitter", "github", "trello", "domain"]
     )
 
 
-@app.route('/login/using/<provider>', defaults={'user': None, 'account': None})
-@app.route('/login/as/<user>/using/<provider>', defaults={'account': None})
-@app.route('/login/with/<account>', defaults={'user': None, 'provider': None})
-@app.route('/login/as/<user>/with/<account>',
-    endpoint='login_specific',
-    defaults={'provider': None})
-@app.route('/login', defaults={'provider': None, 'user': None, 'account': None})
-def login(provider, user, account):
-    user = user or request.args.get('user')
-    account = account or request.args.get('account')
-    provider = provider or request.args.get('provider')
-    initial_account = request.args.get('initial_account')
+@app.route("/public-key")
+def public_key():
+    pem = app.config["PUBLIC_KEY"]
+    if request.headers.get("Accept") == "application/json":
+        jwk = jwcrypto_jwk.JWK.from_pem(pem)
+        resp = make_response(jwk.export())
+        resp.headers["Content-Type"] = "application/json"
+    else:
+        resp = make_response(pem)
+        resp.headers["Content-Type"] = "text/plain"
+    return resp
 
-    if 'redirect_uri' in request.args:
-        session['redirect_uri'] = request.args['redirect_uri']
+
+@app.route("/login-screen")
+def login_screen():
+    return render_template(
+        "login-screen.html",
+        destination=request.args.get("site_name")
+        or request.args.get("redirect_uri")
+        or "a website",
+    )
+
+
+@app.route("/login/using/<provider>", defaults={"user": None, "account": None})
+@app.route("/login/as/<user>/using/<provider>", defaults={"account": None})
+@app.route("/login/with/<account>", defaults={"user": None, "provider": None})
+@app.route(
+    "/login/as/<user>/with/<account>",
+    endpoint="login_specific",
+    defaults={"provider": None},
+)
+@app.route("/login", defaults={"provider": None, "user": None, "account": None})
+def login(provider, user, account):
+    user = user or request.args.get("user")
+    account = account or request.args.get("account")
+    provider = provider or request.args.get("provider")
+    initial_account = request.args.get("initial_account")
+
+    if "redirect_uri" in request.args:
+        session["redirect_uri"] = request.args["redirect_uri"]
 
     if user:
         if not username_valid(user):
-            return 'username must use only ascii letters, numbers and underscores.', 400
+            return "username must use only ascii letters, numbers and underscores.", 400
 
-        session['desired_user'] = user
+        session["desired_user"] = user
 
     if account:
-        session['desired_account'] = account
+        session["desired_account"] = account
 
     if initial_account:
-        session['initial_account'] = initial_account
+        session["initial_account"] = initial_account
 
     if not provider:
         provider = account_type(account)
@@ -108,46 +118,53 @@ def login(provider, user, account):
     try:
         handle = globals()[provider].handle
     except KeyError:
-        return 'unsupported provider {}'.format(provider), 404
+        return "unsupported provider {}".format(provider), 404
 
     return handle()
 
 
-@app.route('/callback/from/<provider>',
-    endpoint='callback',
-    defaults={'account': None},
-    methods=['GET', 'POST'])
-@app.route('/callback', defaults={'provider': None, 'account': None})
-@app.route('/authorized/<account>', endpoint='authorized', defaults={'provider': None})
+@app.route(
+    "/callback/from/<provider>",
+    endpoint="callback",
+    defaults={"account": None},
+    methods=["GET", "POST"],
+)
+@app.route("/callback", defaults={"provider": None, "account": None})
+@app.route("/authorized/<account>", endpoint="authorized", defaults={"provider": None})
 def callback(provider, account):
     if provider:
-        account = globals()[provider].callback()
+        try:
+            account = globals()[provider].callback()
+        except:
+            return abort(500)
     elif not account:
         return abort(400)
 
     if not account:
-        return 'could not authenticate with {}'.format(provider), 403
+        return "could not authenticate with {}".format(provider), 403
 
-    if session.get('desired_account', account) != account:
-        return 'you wanted to login as {}, but logged as {}'.format(
-            session['desired_account'],
-            account
-        ), 403
+    if session.get("desired_account", account) != account:
+        return (
+            "you wanted to login as {}, but logged as {}".format(
+                session["desired_account"], account
+            ),
+            403,
+        )
     try:
-        del session['desired_account']
+        del session["desired_account"]
         session.modified = True
     except:
         pass
 
-    session['authorized_accounts'] = session.get('authorized_accounts', {})
-    session['authorized_accounts'][account] = True
+    session["authorized_accounts"] = session.get("authorized_accounts", {})
+    session["authorized_accounts"][account] = True
     session.modified = True
 
     # now we need a username
     # let's see if one was supplied by the visitor
-    user = session.get('desired_user', request.args.get('user'))
+    user = session.get("desired_user", request.args.get("user"))
     try:
-        del session['desired_user']
+        del session["desired_user"]
         session.modified = True
     except:
         pass
@@ -158,21 +175,19 @@ def callback(provider, account):
         with pg:
             with pg.cursor() as c:
                 c.execute(
-                    'SELECT user_id FROM accounts '
-                    'WHERE account = %s',
-                    (account,)
+                    "SELECT user_id FROM accounts " "WHERE account = %s", (account,)
                 )
                 if c.rowcount == 0:
-                    return render_template('choose-username.html', account=account)
+                    return render_template("choose-username.html", account=account)
                 (user,) = c.fetchone()
 
     if not username_valid(user):
-        return 'username must use only ascii letters, numbers and underscores.', 400
+        return "username must use only ascii letters, numbers and underscores.", 400
 
-    if 'initial_account' in session:
+    if "initial_account" in session:
         # if this exists, it means `account` is being used to authorize
         # `initial_account` into `user`
-        initial_account = session.pop('initial_account')
+        initial_account = session.pop("initial_account")
         session.modified = True
 
         # from now on we just use the initial_account as the account
@@ -184,17 +199,16 @@ def callback(provider, account):
     with pg:
         with pg.cursor() as c:
             c.execute(
-                'SELECT user_id, account FROM accounts '
-                'WHERE (user_id = %s OR account = %s)',
-                (user, account)
+                "SELECT user_id, account FROM accounts "
+                "WHERE (user_id = %s OR account = %s)",
+                (user, account),
             )
 
             if c.rowcount == 0:
                 # user is new, register
                 c.execute(
-                    'INSERT INTO accounts (user_id, account) '
-                    'VALUES (%s, %s)',
-                    (user, account)
+                    "INSERT INTO accounts (user_id, account) " "VALUES (%s, %s)",
+                    (user, account),
                 )
                 return return_user_token(user)
 
@@ -215,83 +229,87 @@ def callback(provider, account):
                             # different user, let's see if the vistor
                             # wants to login with his old username
                             return render_template(
-                                'prompt_user.html',
+                                "prompt_user.html",
                                 r_user=r_user,
                                 user=user,
-                                account=account
+                                account=account,
                             )
-                    elif r_account in session['authorized_accounts']:
+                    elif r_account in session["authorized_accounts"]:
                         # the visitor has already authorized with one
                         # of his old accounts, so everything is fine
                         c.execute(
-                            'INSERT INTO accounts (user_id, account) '
-                            'VALUES (%s, %s) ON CONFLICT DO NOTHING',
-                            (user, account)
+                            "INSERT INTO accounts (user_id, account) "
+                            "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                            (user, account),
                         )
                         return return_user_token(user)
 
                     alternatives.append(r_account)
 
                 if len(alternatives) == 1:
-                    return redirect(app.config['SERVICE_URL'] + url_for(
-                        '.login_specific',
-                        redirect_uri=session.pop('redirect_uri', ''),
-                        user=user,
-                        account=alternatives[0],
-                        initial_account=account
-                    ))
+                    return redirect(
+                        app.config["SERVICE_URL"]
+                        + url_for(
+                            ".login_specific",
+                            redirect_uri=session.pop("redirect_uri", ""),
+                            user=user,
+                            account=alternatives[0],
+                            initial_account=account,
+                        )
+                    )
                 else:
                     return render_template(
-                        'alternatives.html',
+                        "alternatives.html",
                         alternatives=alternatives,
                         user=user,
-                        account=account
+                        account=account,
                     )
 
 
-@app.route('/redirect/<current_user>/to/<next_user>/with/<account>')
+@app.route("/redirect/<current_user>/to/<next_user>/with/<account>")
 def redirect_user_id(current_user, next_user, account):
-    if session['account'] != account or \
-            session['user'] != current_user:
-        return 'wrong user/account, go to /login first', 403
+    if session["account"] != account or session["user"] != current_user:
+        return "wrong user/account, go to /login first", 403
 
-    session['authorized'] = session.get('authorized', [])
-    session['authorized'].append(account)
+    session["authorized"] = session.get("authorized", [])
+    session["authorized"].append(account)
     session.modified = True
 
-    return redirect(app.config['SERVICE_URL'] + url_for('.authorized'))
+    return redirect(app.config["SERVICE_URL"] + url_for(".authorized"))
 
 
-@app.route('/link/<account>/on/<user>/with/<alt_account>', methods=['POST'])
+@app.route("/link/<account>/on/<user>/with/<alt_account>", methods=["POST"])
 def link(account, user, alt_account):
-    if session['account'] != account or \
-            session['user'] != user or \
-            session['alt_account'] != alt_account:
-        return 'wrong user/account, go to /login first', 403
+    if (
+        session["account"] != account
+        or session["user"] != user
+        or session["alt_account"] != alt_account
+    ):
+        return "wrong user/account, go to /login first", 403
 
     with pg:
         with pg.cursor() as c:
             c.execute(
-                'INSERT INTO accounts (account, user_id) '
-                'VALUES (%s, %s) '
-                'ON CONFLICT (account) '
-                'DO UPDATE SET user_id = %s',
-                (account, user, user)
+                "INSERT INTO accounts (account, user_id) "
+                "VALUES (%s, %s) "
+                "ON CONFLICT (account) "
+                "DO UPDATE SET user_id = %s",
+                (account, user, user),
             )
 
     return return_user_token(user)
 
 
-@app.route('/verify/<token>', methods=['POST'])
+@app.route("/verify/<token>", methods=["POST"])
 def verify(token):
     try:
-        decoded = jwt.decode(token, app.config['PUBLIC_KEY'], algorithms='RS256')
+        decoded = jwt.decode(token, app.config["PUBLIC_KEY"], algorithms="RS256")
         return jsonify(decoded)
     except jwt.exceptions.InvalidAlgorithmError:
         return abort(400)
 
 
-@app.route('/lookup/<name>')
+@app.route("/lookup/<name>")
 def lookup(name):
     return jsonify(_lookup(name))
 
@@ -299,57 +317,49 @@ def lookup(name):
 def _lookup(name):
     name = name.strip().lower()
     if not name:
-        return {'error': 'invalid'}
+        return {"error": "invalid"}
 
     with pg:
         with pg.cursor() as c:
             c.execute(
-                'SELECT user_id, account FROM accounts '
-                'WHERE user_id = ('
-                    'SELECT user_id FROM accounts '
-                    'WHERE user_id = %s OR account = %s '
-                    'LIMIT 1'
-                ')',
-                (name, name)
+                "SELECT user_id, account FROM accounts "
+                "WHERE user_id = ("
+                "SELECT user_id FROM accounts "
+                "WHERE user_id = %s OR account = %s "
+                "LIMIT 1"
+                ")",
+                (name, name),
             )
 
             rows = c.fetchall()
-            accs = [{
-                'account': r[1],
-                'type': account_type(r[1])
-            } for r in rows]
+            accs = [{"account": r[1], "type": account_type(r[1])} for r in rows]
 
             if c.rowcount:
-                return {
-                    'id': rows[0][0],
-                    'accounts': accs
-                }
+                return {"id": rows[0][0], "accounts": accs}
             else:
-                return {
-                    'id': None,
-                    'type': account_type(name)
-                }
+                return {"id": None, "type": account_type(name)}
 
 
 def return_user_token(user):
-    token = jwt.encode({
-        'user': user,
-        'role': 'accountd_user'
-    }, app.config['PRIVATE_KEY'], algorithm='RS256')
+    token = jwt.encode(
+        {"user": user, "role": "accountd_user"},
+        app.config["PRIVATE_KEY"],
+        algorithm="RS256",
+    )
 
-    redirect_uri = session.pop('redirect_uri', '')
+    redirect_uri = session.pop("redirect_uri", "")
     if redirect_uri:
         # pass response to external caller
         u = parse.urlparse(redirect_uri)
         qs = parse.parse_qs(u.query)
-        qs['token'] = token
-        back = u.scheme + '://' + u.netloc + u.path + '?' + parse.urlencode(qs)
+        qs["token"] = token
+        back = u.scheme + "://" + u.netloc + u.path + "?" + parse.urlencode(qs)
         return redirect(back)
 
     resp = make_response(token)
-    resp.headers['Content-Type'] = 'text/plain'
+    resp.headers["Content-Type"] = "text/plain"
     return resp
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=16725)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=16725)
